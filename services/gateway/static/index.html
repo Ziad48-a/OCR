@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCR · Letter Recognition</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #1e1e1e;
+    --accent: #e8ff47;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #555;
+    --success: #4ade80;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 60px 24px;
+  }
+
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 64px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+  }
+
+  .logo { display: flex; flex-direction: column; gap: 4px; }
+
+  .logo-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(56px, 8vw, 96px);
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    color: var(--text);
+  }
+
+  h1 span { color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    transition: all 0.3s;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: all 0.3s;
+  }
+
+  .status-pill.online { color: var(--success); border-color: rgba(74,222,128,0.3); }
+  .status-pill.online .status-dot { background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse 2s infinite; }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .upload-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  .drop-zone {
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    padding: 48px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+    min-height: 280px;
+  }
+
+  .drop-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(232,255,71,0.04) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); border-style: solid; }
+  .drop-zone:hover::before, .drop-zone.drag-over::before { opacity: 1; }
+
+  .drop-icon {
+    width: 48px; height: 48px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    transition: all 0.25s;
+  }
+
+  .drop-zone:hover .drop-icon { border-color: var(--accent); background: rgba(232,255,71,0.08); }
+
+  .drop-text { text-align: center; }
+  .drop-text p { font-size: 14px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .drop-text strong { display: block; font-size: 15px; color: var(--text); font-weight: 500; margin-bottom: 6px; }
+
+  #file-input { display: none; }
+
+  .preview-box {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 280px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .preview-box img { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 2px; }
+
+  .preview-placeholder {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 2;
+  }
+
+  .predict-btn {
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: #0a0a0a;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 24px;
+  }
+
+  .predict-btn:hover { background: #f5ff7a; transform: translateY(-1px); box-shadow: 0 8px 32px rgba(232,255,71,0.25); }
+  .predict-btn:active { transform: translateY(0); }
+  .predict-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .predict-btn .btn-loader {
+    display: none;
+    width: 18px; height: 18px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto;
+  }
+
+  .predict-btn.loading .btn-text { display: none; }
+  .predict-btn.loading .btn-loader { display: block; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Result */
+  .result-card {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    padding: 40px;
+    display: none;
+  }
+
+  .result-card.visible {
+    display: block;
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-header {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  .result-main {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    margin-bottom: 32px;
+  }
+
+  .result-letter {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 160px;
+    line-height: 1;
+    color: var(--accent);
+    text-shadow: 0 0 80px rgba(232,255,71,0.4);
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .result-meta { flex: 1; }
+
+  .confidence-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .confidence-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 64px;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 16px;
+  }
+
+  .confidence-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .error-card {
+    border: 1px solid rgba(255,107,53,0.3);
+    border-radius: 4px;
+    background: rgba(255,107,53,0.05);
+    padding: 20px 24px;
+    display: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--accent2);
+    margin-bottom: 16px;
+  }
+
+  .error-card.visible { display: block; }
+
+  .info-strip {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 24px;
+  }
+
+  .info-item {
+    flex: 1;
+    padding: 16px 20px;
+    border-right: 1px solid var(--border);
+  }
+
+  .info-item:last-child { border-right: none; }
+
+  .info-item .label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .info-item .value { font-size: 14px; color: var(--text); font-weight: 500; }
+
+  @media (max-width: 640px) {
+    .upload-section { grid-template-columns: 1fr; }
+    header { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .result-main { flex-direction: column; gap: 24px; }
+    .result-letter { font-size: 100px; }
+    .info-strip { flex-direction: column; }
+    .info-item { border-right: none; border-bottom: 1px solid var(--border); }
+    .info-item:last-child { border-bottom: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <span class="logo-tag">best_mobilenet</span>
+      <h1>OCR<span>.</span></h1>
+    </div>
+    <div class="status-pill" id="status-pill">
+      <div class="status-dot"></div>
+      <span id="status-text">checking...</span>
+    </div>
+  </header>
+
+  <div class="upload-section">
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="image/jpeg,image/png">
+      <div class="drop-icon">✦</div>
+      <div class="drop-text">
+        <strong>Drop your image here</strong>
+        <p>or click to browse</p>
+        <p>JPEG · PNG</p>
+      </div>
+    </div>
+
+    <div class="preview-box" id="preview-box">
+      <div class="preview-placeholder">
+        <p>preview</p>
+        <p>will appear</p>
+        <p>here</p>
+      </div>
+    </div>
+  </div>
+
+  <button class="predict-btn" id="predict-btn" disabled>
+    <span class="btn-text">RECOGNIZE LETTER</span>
+    <div class="btn-loader"></div>
+  </button>
+
+  <div class="error-card" id="error-card"></div>
+
+  <div class="result-card" id="result-card">
+    <div class="result-header">// prediction result</div>
+    <div class="result-main">
+      <div class="result-letter" id="result-letter">?</div>
+      <div class="result-meta">
+        <div class="confidence-label">CONFIDENCE</div>
+        <div class="confidence-value" id="confidence-value">—</div>
+        <div class="confidence-bar">
+          <div class="confidence-fill" id="confidence-fill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-strip">
+    <div class="info-item">
+      <div class="label">Model</div>
+      <div class="value">MobileNetV2</div>
+    </div>
+    <div class="info-item">
+      <div class="label">Classes</div>
+      <div class="value">26 Letters</div>
+    </div>
+    <div class="info-item">
+      <div class="label">Endpoint</div>
+      <div class="value" style="font-family:'DM Mono',monospace;font-size:12px;">${window.location.hostname}:8000</div>
+    </div>
+    <div class="info-item">
+      <div class="label">Input</div>
+      <div class="value">224 × 224</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API = `${window.location.protocol}//${window.location.hostname}:8000`;
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const previewBox = document.getElementById('preview-box');
+  const predictBtn = document.getElementById('predict-btn');
+  const resultCard = document.getElementById('result-card');
+  const errorCard = document.getElementById('error-card');
+  const statusPill = document.getElementById('status-pill');
+  const statusText = document.getElementById('status-text');
+
+  let selectedFile = null;
+
+  async function checkHealth() {
+    try {
+      const res = await fetch(`${API}/health`);
+      if (res.ok) {
+        statusPill.classList.add('online');
+        statusText.textContent = 'API online';
+      } else {
+        statusText.textContent = 'API error';
+      }
+    } catch {
+      statusText.textContent = 'API offline';
+    }
+  }
+  checkHealth();
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      showError('Please upload a JPEG or PNG image.');
+      return;
+    }
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewBox.innerHTML = `<img src="${e.target.result}" alt="preview">`;
+    };
+    reader.readAsDataURL(file);
+    predictBtn.disabled = false;
+    hideError();
+    resultCard.classList.remove('visible');
+  }
+
+  predictBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    predictBtn.classList.add('loading');
+    predictBtn.disabled = true;
+    hideError();
+    resultCard.classList.remove('visible');
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const res = await fetch(`${API}/predict`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Prediction failed');
+      showResult(data.predicted_character, data.confidence);
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      predictBtn.classList.remove('loading');
+      predictBtn.disabled = false;
+    }
+  });
+
+  function showResult(letter, confidence) {
+    const letterEl = document.getElementById('result-letter');
+    const confEl = document.getElementById('confidence-value');
+    const fillEl = document.getElementById('confidence-fill');
+
+    letterEl.textContent = letter;
+    const conf = Math.round(confidence);
+    confEl.textContent = `${conf}%`;
+    fillEl.style.width = '0%';
+
+    resultCard.classList.add('visible');
+
+    setTimeout(() => { fillEl.style.width = `${conf}%`; }, 150);
+    setTimeout(() => { resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+  }
+
+  function showError(msg) {
+    errorCard.textContent = `⚠ ${msg}`;
+    errorCard.classList.add('visible');
+  }
+
+  function hideError() {
+    errorCard.classList.remove('visible');
+  }
+</script>
+</body>
+</html>

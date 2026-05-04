@@ -1,0 +1,62 @@
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ocr_user
+      RABBITMQ_DEFAULT_PASS: ocr_password
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # management UI → http://localhost:15672
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  classifier:
+    build:
+      context: ./services/classifier
+    container_name: classifier
+    ports:
+      - "8001:8001"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  gateway:
+    build:
+      context: ./services/gateway
+    container_name: gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      classifier:
+        condition: service_started
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ocr_user
+      RABBITMQ_PASSWORD: ocr_password
+      CLASSIFIER_URL: http://classifier:8001
+      LOGGER_URL: http://logger:8002
+
+  logger:
+    build:
+      context: ./services/logger
+    container_name: logger
+    ports:
+      - "8002:8002"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ocr_user
+      RABBITMQ_PASSWORD: ocr_password
