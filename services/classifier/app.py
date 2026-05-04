@@ -1,10 +1,9 @@
 from fastapi import FastAPI, File, UploadFile  
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi import HTTPException
 import torch
-
+# ✅
 from ocr_inference import load_model
 from ocr_inference import preprocess
 from ocr_inference import predict
@@ -22,8 +21,9 @@ app.add_middleware(
 index_path = os.path.join(os.path.dirname(__file__), 'index.html')
 model = None
 CLASSES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
-model_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'best_mobilenet.pth')
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# model_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'ocr_mobilenetv2.pth')
+model_path = os.path.join(os.path.dirname(__file__), 'ocr_mobilenetv2.pth')
+device = "cpu"
 @app.on_event("startup")
 def startup_event():
     # if not os.path.exists(model_path):
@@ -40,7 +40,6 @@ def health_check():
             " model loaded successfully! , "
             "supported classes: " + ", ".join(CLASSES)}
 
-#we need web dashboard
 
 @app.post("/predict")
 async def predict_endpoint(file: UploadFile = File(...)):
@@ -66,8 +65,8 @@ async def predict_endpoint(file: UploadFile = File(...)):
                 "confidence": confidence}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-@app.get("/", response_class=HTMLResponse)
-async def serve_dashboard():
-    with open(index_path, 'r', encoding='utf-8') as f:  
-        return f.read()
-# Run the app with: python -m uvicorn main:app --reload
+# @app.get("/", response_class=HTMLResponse)
+# async def serve_dashboard():
+#     with open(index_path, 'r', encoding='utf-8') as f:  
+#         return f.read()
+# Run the app with: python -m uvicorn app:app --reload

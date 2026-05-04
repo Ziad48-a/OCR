@@ -10,22 +10,37 @@ import cv2
 from PIL import Image
 import matplotlib.pyplot as plt
 
+#for best_mobilenet model
+# class OCRMobileNetV2(nn.Module):
+#     def __init__(self, num_classes=26):
+#         super().__init__()
+#         self.model = models.mobilenet_v2(pretrained=False)
+#         self.model.classifier[1] = nn.Linear(self.model.last_channel, num_classes)
 
+#     def forward(self, x):
+#         return self.model(x)
+#fir ocr_mobilenetv2 model
 class OCRMobileNetV2(nn.Module):
     def __init__(self, num_classes=26, dropout_rate=0.3):
         super().__init__()
-        self.features = models.mobilenet_v2(pretrained=False).features
+        self.backbone = models.mobilenet_v2(pretrained=False)
+        for param in self.backbone.parameters():
+            param.requires_grad = False
         self.classifier = nn.Sequential(
             nn.Dropout(dropout_rate),
-            nn.Linear(1280, num_classes)
+            nn.Linear(1280, 512),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate / 2),
+            nn.Linear(512, num_classes)
         )
 
-    def forward(self, x):
-        x = self.features(x)
+    def forward(self, x):                                    # ✅ indented inside class
+        x = self.backbone.features(x)
         x = nn.functional.adaptive_avg_pool2d(x, (1, 1))
         x = torch.flatten(x, 1)
         return self.classifier(x)
 
+print("✓ Model class defined")
 print("✓ Model class defined")
 #load the model weights 
 def load_model(model_path):
@@ -38,6 +53,16 @@ def load_model(model_path):
     model.load_state_dict(state_dict)
     model.eval()
     return model
+
+# def load_model(model_path):
+#     model = OCRMobileNetV2(num_classes=26)
+#     checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+#     if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+#         model.model.load_state_dict(checkpoint['model_state_dict'])
+#     else:
+#         model.model.load_state_dict(checkpoint)
+#     model.eval()
+#     return model
 #prrepcessing pipeline: real photo → MNIST-style → ImageNet-normalised tensor
 
 def to_mnist_style(image_path: str):

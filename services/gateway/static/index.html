@@ -403,7 +403,7 @@
     </div>
     <div class="info-item">
       <div class="label">Endpoint</div>
-      <div class="value" style="font-family:'DM Mono',monospace;font-size:12px;">127.0.0.1:8000</div>
+      <div class="value" style="font-family:'DM Mono',monospace;font-size:12px;">${window.location.hostname}:8000</div>
     </div>
     <div class="info-item">
       <div class="label">Input</div>
@@ -414,7 +414,7 @@
 </div>
 
 <script>
-  const API = 'http://127.0.0.1:8000';
+  const API = `${window.location.protocol}//${window.location.hostname}:8000`;
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('file-input');
   const previewBox = document.getElementById('preview-box');
